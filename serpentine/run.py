@@ -18,10 +18,11 @@ def main():
     # Print all possible environments in the Pommerman registry
     print(pommerman.REGISTRY)
 
-    # Create a set of agents (exactly four)
+    # Create a set of agents (exactly two/four)
     agent_list = [
         MyAgent(),
-        agents.SimpleAgent(),
+        agents.SimpleAgent()
+
     ]
 
     # Make the "Free-For-All" environment using the agent list
@@ -48,4 +49,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-## random comment
+
