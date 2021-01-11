@@ -1,7 +1,10 @@
 import numpy as np
+
 from pommerman import characters
 from pommerman.constants import Action, Item
 from pommerman.agents import BaseAgent
+
+from serpentine.directions import Direction, Directions
 
 
 class MyAgent(BaseAgent):
@@ -13,96 +16,65 @@ class MyAgent(BaseAgent):
 
     def act(self, obs, action_space):
         # Main event that is being called on every turn.
-        goal_location = (2, 2)
-
-        if len(self.queue) == 0:
+        if not self.queue:
             my_location = obs['position']
             board = obs['board']
-            if self.can_move_to(board, my_location, goal_location):
-                print("Can now move to this location: ", goal_location)
-            if self.check_left(board, my_location):
-                self.queue.append(Action.Left)
-            if self.check_up(board, my_location):
-                self.queue.append(Action.Up)
-            if self.check_right(board, my_location):
-                self.queue.append(Action.Right)
-            if self.check_down(board, my_location):
-                self.queue.append(Action.Down)
+            goal_location = (6, 6)
+
+            for direction in self.create_path(board, my_location, goal_location):
+                self.queue.append(direction.action)
 
             if not self.queue:
                 self.queue.append(Action.Stop)
 
-        return self.queue.pop()
+            return self.queue.pop(0)
 
-    def check_left(self, board: np.array, my_location: tuple) -> bool:
-        """
-        Checks if we can move to the left. Returns true if possible.
-        """
-        row, col = my_location
-        if board[row, max(col - 1, 0)] == Item.Passage.value:
-            return True
-        return False
+    def in_bounds(self, location: tuple) -> bool:
+        return 0 <= min(location) and max(location) <= 7
 
-    def check_up(self, board: np.array, my_location: tuple) -> bool:
-        """
-        Checks if we can move up. Returns true if possible.
-        """
-        row, col = my_location
-        if board[max(col - 1, 0), row] == Item.Passage.value:
-            return True
-        return False
+    def check_direction(self, board: np.array, location: tuple, direction: Directions) -> bool:
+        new_location = np.array(location) + direction.array
+        if not self.in_bounds(new_location):
+            return False
 
-    def check_right(self, board: np.array, my_location: tuple) -> bool:
-        """
-        Checks if we can move to the right. Returns true if possible.
-        """
-        row, col = my_location
-        if board[row, min(col + 1, 7)] == Item.Passage.value:
-            return True
-        return False
+        return board[tuple(new_location)] == Item.Passage.value
 
-    def check_down(self, board: np.array, my_location: tuple) -> bool:
+    def reverse_path(self, came_from: dict, came_from_direction: dict, goal_location: tuple) -> list:
+        current = goal_location
+        parent = came_from.get(goal_location, None)
+        path = []
 
-        """
-        Checks if we can move down. Returns true if possible.
-        """
-        row, col = my_location
-        if board[min(col + 1, 7), row] == Item.Passage.value:
-            return True
-        return False
+        while parent is not None:
+            path.append(came_from_direction[current])
+            current, parent = parent, came_from.get(parent, None)
+        return list(reversed(path))
 
-    def can_move_to(self, board: np.array, my_location: tuple, goal_location: tuple) -> bool:
-        directions = dict(left=np.array([0, -1]), right=np.array([0, 1]), down=np.array([-1, 0]), up=np.array([1, 0]))
-
+    def create_path(self, board: np.array, my_location: tuple, goal_location: tuple) -> list:
         to_visit = [my_location]
         visited = []
 
+        came_from = dict()
+        came_from[my_location] = None
+
+        came_from_direction = dict()
+        came_from_direction[my_location] = Directions.ZERO
+
         while to_visit:
-            next_location = to_visit.pop(0)
-            for key, value in directions.items():
+            point = to_visit.pop(0)
+            if point == goal_location: break
+            for direction in Directions.NEIGHBORS:
+                new_point = tuple(np.array(point) + direction.array)
 
-                new_point = tuple(np.array(next_location) + value)
-                if new_point == goal_location:
-                    return True
-
-                if min(new_point) < 0 or max(new_point) > 7:
+                if not self.in_bounds(new_point):
                     continue
 
                 if new_point in visited:
                     continue
 
-                if key == "left" and self.check_left(board, tuple(next_location)):
+                if self.check_direction(board, point, direction):
                     to_visit.append(new_point)
-                elif key == "right" and self.check_right(board, tuple(next_location)):
-                    to_visit.append(new_point)
-                elif key == "up" and self.check_up(board, tuple(next_location)):
-                    to_visit.append(new_point)
-                elif key == "down" and self.check_down(board, tuple(next_location)):
-                    to_visit.append(new_point)
+                    came_from[new_point] = point
+                    came_from_direction[new_point] = direction
 
-            visited.append(next_location)
-
-        return False
-
-
-
+            visited.append(point)
+        return self.reverse_path(came_from, came_from_direction, goal_location)
