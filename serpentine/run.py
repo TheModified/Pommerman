@@ -21,8 +21,8 @@ def main():
     # Create a set of agents (exactly two/four)
     agent_list = [
         MyAgent(),
-        agents.SimpleAgent()
-
+        # agents.SimpleAgent(),
+        agents.PlayerAgent()
     ]
 
     # Make the "Free-For-All" environment using the agent list
@@ -42,7 +42,8 @@ def main():
             # This performs the step and gives back the new information
             state, reward, done, info = env.step(actions)
 
-        print(f"Episode: {episode:2d} finished, result: {'Win' if 0 in info.get('winners', []) else 'Lose'}")
+        result = info['result'].name if 0 in info.get('winners', []) or info['result'].name == 'Tie' else 'Lose'
+        print(f"Episode: {episode:2d} finished, result: {result}")
     env.close()
 
 
