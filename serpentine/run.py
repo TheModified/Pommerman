@@ -29,12 +29,12 @@ def main():
     env = pommerman.make('OneVsOne-v0', agent_list)
 
     # Run the episodes just like OpenAI Gym
-    for episode in range(1):
+    for episode in range(10):
         state = env.reset()
         done = False
         while not done:
             # This renders the game
-            env.render()
+            env.render(do_sleep=False)
 
             # This is where we give an action to the environment
             actions = env.act(state)

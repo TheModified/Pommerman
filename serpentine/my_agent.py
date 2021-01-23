@@ -19,7 +19,10 @@ class MyAgent(BaseAgent):
         if not self.queue:
             my_location = obs['position']
             board = obs['board']
-            goal_location = (6, 6)
+            goal_location = self.move_to_safe_location(obs, my_location)
+
+            if self.can_place_bomb(obs['bomb_life'], obs['ammo'], my_location):
+                self.queue.append(Action.Bomb)
 
             for direction in self.create_path(board, my_location, goal_location):
                 self.queue.append(direction.action)
@@ -27,12 +30,12 @@ class MyAgent(BaseAgent):
             if not self.queue:
                 self.queue.append(Action.Stop)
 
-            return self.queue.pop(0)
+        return self.queue.pop(0)
 
     def in_bounds(self, location: tuple) -> bool:
         return 0 <= min(location) and max(location) <= 7
 
-    def check_direction(self, board: np.array, location: tuple, direction: Directions) -> bool:
+    def check_direction(self, board: np.array, location: tuple, direction: Direction) -> bool:
         new_location = np.array(location) + direction.array
         if not self.in_bounds(new_location):
             return False
@@ -61,7 +64,8 @@ class MyAgent(BaseAgent):
 
         while to_visit:
             point = to_visit.pop(0)
-            if point == goal_location: break
+            if point == goal_location:
+                break
             for direction in Directions.NEIGHBORS:
                 new_point = tuple(np.array(point) + direction.array)
 
@@ -78,3 +82,60 @@ class MyAgent(BaseAgent):
 
             visited.append(point)
         return self.reverse_path(came_from, came_from_direction, goal_location)
+
+    def can_place_bomb(self, bomb_life: np.ndarray, ammo: int, my_location: tuple) -> bool:
+        return bomb_life[my_location] == 0 and ammo > 0
+
+    def create_danger_map(self, obs: dict) -> np.ndarray:
+        danger_map = obs['flame_life']
+        danger_map[danger_map > 0] = 1
+
+        bombs = np.where(obs['bomb_life'] > 0)
+        bombs_timers = map(int, obs['bomb_life'][bombs])
+        bomb_strength = map(int, obs['bomb_blast_strength'][bombs])
+
+        for row, col, timer, strength in zip(*bombs, bombs_timers, bomb_strength):
+            strength -= 1
+
+            row_low, row_high = max(row - strength, 0), min(row + strength, 7)
+            col_low, col_high = max(col - strength, 0), min(col + strength, 7)
+
+            for row_danger in range(row_low, row_high + 1):
+                danger_map[row_danger, col] = timer
+
+            for col_danger in range(col_low, col_high + 1):
+                danger_map[row, col_danger] = timer
+
+        return danger_map
+
+    def find_reachable_safe_location(self, board: np.ndarray, danger_map: np.ndarray, location: tuple) -> tuple:
+        to_visit = [location]
+        visited = []
+
+        while to_visit:
+            point = to_visit.pop(0)
+
+            if danger_map[point] == 0:
+                return point
+
+            for direction in Directions.NEIGHBORS:
+                new_point = tuple(np.array(point) + direction.array)
+
+                if not self.in_bounds(new_point) or new_point in visited or danger_map[new_point] == 1:
+                    continue
+
+                if self.check_direction(board, point, direction):
+                    to_visit.append(new_point)
+
+            visited.append(point)
+
+        return location
+
+    def move_to_safe_location(self, obs, location: tuple):
+
+        # Create a mapping of positions and danger level
+        danger_map = self.create_danger_map(obs)
+
+        # Check if our current position is safe, if so we can go/stay there.
+        return self.find_reachable_safe_location(obs['board'], danger_map, location)
+
