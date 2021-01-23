@@ -139,3 +139,13 @@ class MyAgent(BaseAgent):
         # Check if our current position is safe, if so we can go/stay there.
         return self.find_reachable_safe_location(obs['board'], danger_map, location)
 
+    def find_crates(self, board: np.ndarray, location: tuple) -> int:
+
+        crates = 0
+        for direction in Directions.NEIGHBORS:
+            new_point = tuple(direction.array + np.array(location))
+            if self.in_bounds(new_point) and board[new_point] == Item.Wood.value:
+        crates += 1
+
+        return crates
+
