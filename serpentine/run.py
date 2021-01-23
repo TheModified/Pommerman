@@ -21,8 +21,8 @@ def main():
     # Create a set of agents (exactly two/four)
     agent_list = [
         MyAgent(),
-        # agents.SimpleAgent(),
-        agents.PlayerAgent()
+        agents.SimpleAgent()
+        # agents.PlayerAgent()
     ]
 
     # Make the "Free-For-All" environment using the agent list

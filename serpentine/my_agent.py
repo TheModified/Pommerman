@@ -21,7 +21,7 @@ class MyAgent(BaseAgent):
             board = obs['board']
             goal_location = self.move_to_safe_location(obs, my_location)
 
-            if self.can_place_bomb(obs['bomb_life'], obs['ammo'], my_location):
+            if self.can_place_bomb(obs['board'], obs['bomb_life'], obs['ammo'], my_location):
                 self.queue.append(Action.Bomb)
 
             for direction in self.create_path(board, my_location, goal_location):
@@ -83,8 +83,8 @@ class MyAgent(BaseAgent):
             visited.append(point)
         return self.reverse_path(came_from, came_from_direction, goal_location)
 
-    def can_place_bomb(self, bomb_life: np.ndarray, ammo: int, my_location: tuple) -> bool:
-        return bomb_life[my_location] == 0 and ammo > 0
+    def can_place_bomb(self, board: np.ndarray, bomb_life: np.ndarray, ammo: int, my_location: tuple) -> bool:
+        return bomb_life[my_location] == 0 and ammo > 0 and self.find_explodable_neighbours(board, my_location)
 
     def create_danger_map(self, obs: dict) -> np.ndarray:
         danger_map = obs['flame_life']
@@ -108,15 +108,12 @@ class MyAgent(BaseAgent):
 
         return danger_map
 
-    def find_reachable_safe_location(self, board: np.ndarray, danger_map: np.ndarray, location: tuple) -> tuple:
+    def find_reachable_safe_locations(self, board: np.ndarray, danger_map: np.ndarray, location: tuple) -> list:
         to_visit = [location]
         visited = []
 
         while to_visit:
             point = to_visit.pop(0)
-
-            if danger_map[point] == 0:
-                return point
 
             for direction in Directions.NEIGHBORS:
                 new_point = tuple(np.array(point) + direction.array)
@@ -129,23 +126,31 @@ class MyAgent(BaseAgent):
 
             visited.append(point)
 
-        return location
+        return visited
 
     def move_to_safe_location(self, obs, location: tuple):
 
-        # Create a mapping of positions and danger level
         danger_map = self.create_danger_map(obs)
 
-        # Check if our current position is safe, if so we can go/stay there.
-        return self.find_reachable_safe_location(obs['board'], danger_map, location)
+        safe_locations = self.find_reachable_safe_locations(obs['board'], danger_map, location)
+        fully_safe_locations = [location for location in safe_locations if danger_map[location] == 0]
 
-    def find_crates(self, board: np.ndarray, location: tuple) -> int:
+        for safe_location in fully_safe_locations:
+            if self.find_explodable_neighbours(obs['board'], safe_location):
+                return safe_location
 
-        crates = 0
+        if fully_safe_locations:
+            return fully_safe_locations[0]
+        return location
+
+    def find_explodable_neighbours(self, board: np.ndarray, location: tuple) -> int:
+        explodable_count = 0
+        explodable = [Item.Agent1.value, Item.Wood.value, Item.ExtraBomb.value,
+                      Item.IncrRange.value, Item.Kick.value]
+
         for direction in Directions.NEIGHBORS:
             new_point = tuple(direction.array + np.array(location))
-            if self.in_bounds(new_point) and board[new_point] == Item.Wood.value:
-        crates += 1
+            if self.in_bounds(new_point) and board[new_point] in explodable:
+                explodable_count += 1
 
-        return crates
-
+        return explodable_count
